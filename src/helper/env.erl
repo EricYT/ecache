@@ -36,6 +36,7 @@ put(App, Key, Value) ->
   App :: atom(),
   Key :: atom(),
   Value :: term(),
+  Options :: [any(), ...].
 put(App, Key, Value, Options) ->
   application:set_env(App, Key, Value, Options).
 

@@ -4,10 +4,6 @@
 
 %%
 info(Format, Args) ->
--ifdef(debug).
-  PrefixFormat = "------------> [debug info] ~s :  " ++ Format, 
-  io:format(PrefixFormat, [format_utc_timestamp()]++Args),
--endif.
   ok.
 
 format_utc_timestamp() ->

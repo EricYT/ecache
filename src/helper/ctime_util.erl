@@ -1,6 +1,6 @@
 -module(ctime_util).
 
--export([expire/1, now/1]).
+-export([expire/1, now/0]).
 
 -spec expire(Seconds) -> Expire when
     Seconds :: integer(),
