@@ -1,3 +1,4 @@
+deps
 .eunit
 *.o
 *.beam
@@ -7,3 +8,4 @@ ebin
 rel/example_project
 .concrete/DEV_MODE
 .rebar
+_rel

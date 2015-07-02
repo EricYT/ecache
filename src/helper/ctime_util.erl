@@ -6,11 +6,11 @@
     Seconds :: integer(),
     Expire :: integer().
 expire(Seconds) ->
-  {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-  MegaSecs*1000000 + Secs+Seconds + MicroSecs div 1000000.
+  ?MODULE:now()+Seconds.
 
 -spec now() -> integer().
 now() ->
-  {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-  MegaSecs*1000000 + Secs + MicroSecs div 1000000.
+  Now = os:timestamp(),
+  Datetime = calendar:now_to_datetime(Now),
+  calendar:datetime_to_gregorian_seconds(Datetime).
 
