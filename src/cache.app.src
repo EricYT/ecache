@@ -1,0 +1,14 @@
+{application, cache,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  emysql,
+                  eredis
+                 ]},
+  {mod, { cache_app, []}},
+  {env, []}
+ ]}.
