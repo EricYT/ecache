@@ -1,0 +1,3 @@
+# ecache
+
+Cache adapter
