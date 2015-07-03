@@ -4,7 +4,7 @@
 
 -include("cache.hrl").
 
--export([start/0, stop/0, get/1, gets/1, set/3, sets/1, delete/1, size/0]).
+-export([start/0, stop/0, get/1, gets/1, set/3, sets/1, delete/1, size/0, keys/0]).
 %%
 %% APIs
 %%
@@ -29,7 +29,7 @@ stop() ->
     Key :: any(),
     Value :: any().
 get(Key) ->
-  KeyBin = cache:key(Key),
+  KeyBin = cache:pack_key(Key),
   case ets:lookup(?ETS_NAME, KeyBin) of
     [] -> undefined;
     [{_, {Value, Expire}}] ->
@@ -59,7 +59,7 @@ gets([], Acc) -> lists:reverse(Acc).
     Reason :: any().
 set(Key, Value, TTL) ->
   try
-    KeyBin = cache:key(Key),
+    KeyBin = cache:pack_key(Key),
     TTLJudge = judge_expire(TTL),
     ets:insert(?ETS_NAME, {KeyBin, {Value, TTLJudge}}),
     ok
@@ -75,26 +75,23 @@ set(Key, Value, TTL) ->
   Reason :: any(). 
 sets(KeyValues) ->
   KeyValues_ = convert_key_values(KeyValues, []),
-  [   
-      try 
-        ?MODULE:set(Key, Value, TTL),
-        ok  
-      catch Error:Reason ->
-          io:format("--------> sets error:~p~n", [{Error, Reason}]),
-          {error, {Error, Reason}}
-      end 
-  || {Key, Value, TTL}<-KeyValues_ ].
+  ets:insert(?ETS_NAME, KeyValues_),
+  ok.
 
 -spec delete(Key) -> ok when
     Key :: any().
 delete(Key) ->
-  KeyBin = cache:key(Key),
+  KeyBin = cache:pack_key(Key),
   ets:delete(?ETS_NAME, KeyBin),
   ok.
 
 -spec size() -> integer().
 size() ->
   ets:info(?ETS_NAME, size).
+
+-spec keys() -> [term(), ...].
+keys() ->
+  ets:foldl(fun({K, _}, Acc) -> [catch cache:unpack_key(K)|Acc] end, [], ?ETS_NAME).
 
 %% Internal functions
 judge_expire('infinity') -> 'infinity';
@@ -106,8 +103,11 @@ maybe_expire(Expire) ->
   io:format("Expire:~p Now:~p res:~p~n", [Expire, Now, Expire >= Now]),
   Expire >= Now.
 
-convert_key_values([{_, _, _}=KV|Tail], Acc) ->
-  convert_key_values(Tail, [KV|Acc]);
+convert_key_values([{K, V, TTL}|Tail], Acc) ->
+  TTL_ = judge_expire(TTL),
+  K_ = cache:pack_key(K),
+  convert_key_values(Tail, [{K_, {V, TTL_}}|Acc]);
 convert_key_values([{K, V}|Tail], Acc) ->
-  convert_key_values(Tail, [{K, V, 'infinity'}|Acc]);
+  K_ = cache:pack_key(K),
+  convert_key_values(Tail, [{K_, {V, 'infinity'}}|Acc]);
 convert_key_values([], Acc) -> lists:reverse(Acc).

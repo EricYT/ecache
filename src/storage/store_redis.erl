@@ -4,7 +4,7 @@
 
 -include("cache.hrl").
 
--export([start/0, stop/0, get/1, gets/1, set/3, sets/1, delete/1, size/0]).
+-export([start/0, stop/0, get/1, gets/1, set/3, sets/1, delete/1, size/0, keys/0]).
 %%
 %% APIs
 %%
@@ -36,19 +36,18 @@ stop() ->
     Key :: any(),
     Value :: any().
 get(Key) ->
-  KeyBin = cache:key(Key),
+  KeyBin = cache:pack_key(Key),
   Fun = fun(Worker) -> eredis:q(Worker, ["GET", KeyBin]) end,
   case do_cmd(Fun) of
     {ok, Res} -> unpack(Res);
-    Other ->
-      undefined
+    _Other -> undefined
   end.
 
 -spec gets(Keys) -> Values when
     Keys :: [any(), ...],
     Values :: [any(), ...].
 gets(Keys) when is_list(Keys) ->
-  Keys_ = [cache:key(Key) || Key<-Keys],
+  Keys_ = [cache:pack_key(Key) || Key<-Keys],
   Fun = fun(Worker) -> eredis:q(Worker, ["MGET" | Keys_]) end,
   case do_cmd(Fun) of
     {ok, Res} -> [unpack(Value) || Value<-Res];
@@ -62,7 +61,7 @@ gets(Keys) when is_list(Keys) ->
     TTL :: integer() | infinity,
     Reason :: any().
 set(Key, Value, 'infinity') ->
-  KeyBin = cache:key(Key),
+  KeyBin = cache:pack_key(Key),
   Cmd = ["SET", KeyBin, pack(Value)],
   Fun = fun(Worker) -> eredis:q(Worker, Cmd) end,
   case do_cmd(Fun) of
@@ -70,7 +69,7 @@ set(Key, Value, 'infinity') ->
     Other -> Other
   end;
 set(Key, Value, TTL) ->
-  KeyBin = cache:key(Key),
+  KeyBin = cache:pack_key(Key),
   Cmd = [["SET", KeyBin, pack(Value)],
          ["EXPIRE", KeyBin, TTL]],
   Fun = fun(Worker) -> eredis:qp(Worker, Cmd) end,     
@@ -97,7 +96,7 @@ sets(KeyValues) ->
 -spec delete(Key) -> ok when
     Key :: any().
 delete(Key) ->
-  KeyBin = cache:key(Key),
+  KeyBin = cache:pack_key(Key),
   Cmd = ["DEL", KeyBin],
   Fun = fun(Worker) -> eredis:q(Worker, Cmd) end,
   case do_cmd(Fun) of
@@ -114,9 +113,19 @@ size() ->
     {ok, Res} -> erlang:binary_to_integer(Res)
   end.
 
+-spec keys() -> Keys when
+    Keys :: [term(), ...].
+keys() ->
+  Cmd = ["KEYS", ?KEY_PATTERN],
+  Fun = fun(Worker) -> eredis:q(Worker, Cmd) end,
+  case do_cmd(Fun) of
+    {ok, Keys} -> [ catch cache:unpack_key(Key) || Key<-Keys ];
+    _Other -> []
+  end.
+
 %% Internal functions
 convert_key_values([{K, V}|Tail], Acc) ->
-  K_ = cache:key(K),
+  K_ = cache:pack_key(K),
   V_ = pack(V),
   convert_key_values(Tail, [V_, K_|Acc]);
 convert_key_values([], Acc) -> lists:reverse(Acc).
@@ -127,7 +136,8 @@ do_cmd(Fun) ->
   Pool = erlang:list_to_pid(PoolList),
   poolboy:transaction(Pool, Fun).
 
+%% pack and unpack value
 pack(Value) -> erlang:term_to_binary(Value).
 
-unpack(undefined) -> undefined;
-unpack(Value) -> erlang:binary_to_term(Value).
+unpack(Value) when is_binary(Value) -> erlang:binary_to_term(Value);
+unpack(Other) -> Other.

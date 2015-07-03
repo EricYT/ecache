@@ -13,7 +13,8 @@ behaviour_info(callbacks) ->
     {set, 3},
     {sets, 1},
     {delete, 1},
-    {size, 0}
+    {size, 0},
+    {keys, 0}
   ];
 behaviour_info(_Other) -> undefined.
 
