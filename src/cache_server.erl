@@ -30,6 +30,9 @@ stop() ->
 %% ------------------------------------------------------------------
 
 init(Args) ->
+  %% Start lager
+  lager:start(),
+  lager:debug("cache server start "), 
   ok = cache:start(),
   {ok, Args}.
 
