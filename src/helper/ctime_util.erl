@@ -4,13 +4,13 @@
 
 -spec expire(Seconds) -> Expire when
     Seconds :: integer(),
-    Expire :: integer().
+    Expire :: tuple().
 expire(Seconds) ->
-  ?MODULE:now()+Seconds.
+  ExpireSeconds = ?MODULE:now()+Seconds,
+  calendar:gregorian_seconds_to_datetime(ExpireSeconds).
 
 -spec now() -> integer().
 now() ->
-  Now = os:timestamp(),
-  Datetime = calendar:now_to_datetime(Now),
+  Datetime = calendar:local_time(),
   calendar:datetime_to_gregorian_seconds(Datetime).
 

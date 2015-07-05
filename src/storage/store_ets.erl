@@ -99,7 +99,7 @@ judge_expire(TTL) -> ctime_util:expire(TTL).
 
 maybe_expire('infinity') -> true;
 maybe_expire(Expire) ->
-  Now = ctime_util:now(),
+  Now = calendar:local_time(),
   io:format("Expire:~p Now:~p res:~p~n", [Expire, Now, Expire >= Now]),
   Expire >= Now.
 
