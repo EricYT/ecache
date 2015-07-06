@@ -10,8 +10,7 @@
                   lager,
                   emysql,
                   poolboy,
-                  eredis,
-                  mcd
+                  eredis
                  ]},
   {mod, { cache_app, []}},
   {env, []}

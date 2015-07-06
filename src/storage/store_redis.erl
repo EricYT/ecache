@@ -39,7 +39,7 @@ get(Key) ->
   KeyBin = cache:pack_key(Key),
   Fun = fun(Worker) -> eredis:q(Worker, ["GET", KeyBin]) end,
   case do_cmd(Fun) of
-    {ok, Res} -> unpack(Res);
+    {ok, Res} -> cache:unpack(Res);
     _Other -> undefined
   end.
 
@@ -50,7 +50,7 @@ gets(Keys) when is_list(Keys) ->
   Keys_ = [cache:pack_key(Key) || Key<-Keys],
   Fun = fun(Worker) -> eredis:q(Worker, ["MGET" | Keys_]) end,
   case do_cmd(Fun) of
-    {ok, Res} -> [unpack(Value) || Value<-Res];
+    {ok, Res} -> [ cache:unpack(Value) || Value<-Res ];
     Other ->
       undefined
   end.
@@ -62,7 +62,7 @@ gets(Keys) when is_list(Keys) ->
     Reason :: any().
 set(Key, Value, 'infinity') ->
   KeyBin = cache:pack_key(Key),
-  Cmd = ["SET", KeyBin, pack(Value)],
+  Cmd = ["SET", KeyBin, cache:pack(Value)],
   Fun = fun(Worker) -> eredis:q(Worker, Cmd) end,
   case do_cmd(Fun) of
     {ok, _} -> ok;
@@ -70,7 +70,7 @@ set(Key, Value, 'infinity') ->
   end;
 set(Key, Value, TTL) ->
   KeyBin = cache:pack_key(Key),
-  Cmd = [["SET", KeyBin, pack(Value)],
+  Cmd = [["SET", KeyBin, cache:pack(Value)],
          ["EXPIRE", KeyBin, TTL]],
   Fun = fun(Worker) -> eredis:qp(Worker, Cmd) end,     
   case do_cmd(Fun) of
@@ -126,7 +126,7 @@ keys() ->
 %% Internal functions
 convert_key_values([{K, V}|Tail], Acc) ->
   K_ = cache:pack_key(K),
-  V_ = pack(V),
+  V_ = cache:pack(V),
   convert_key_values(Tail, [V_, K_|Acc]);
 convert_key_values([], Acc) -> lists:reverse(Acc).
 
@@ -135,9 +135,3 @@ do_cmd(Fun) ->
   PoolList = mochiglobal:get(?REDIS_POOL),
   Pool = erlang:list_to_pid(PoolList),
   poolboy:transaction(Pool, Fun).
-
-%% pack and unpack value
-pack(Value) -> erlang:term_to_binary(Value).
-
-unpack(Value) when is_binary(Value) -> erlang:binary_to_term(Value);
-unpack(Other) -> Other.

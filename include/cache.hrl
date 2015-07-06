@@ -10,3 +10,5 @@
 %% redis pool
 -define(REDIS_POOL, '$redis_pool$').
 
+%% memcached pool
+-define(MEMCACHED_POOL, '$memcached_pool$').

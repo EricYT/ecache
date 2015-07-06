@@ -99,3 +99,8 @@ config(Key) -> config(cache, Key).
 config(App, Key) -> env:get(App, Key).
 config(App, Key, Default) -> env:get(App, Key, Default).
 
+%% pack and unpack value
+pack(Value) -> erlang:term_to_binary(Value).
+
+unpack(Value) when is_binary(Value) -> erlang:binary_to_term(Value);
+unpack(Other) -> Other. 

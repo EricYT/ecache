@@ -13,7 +13,13 @@
 start() ->
   try
     %%TODO: priviate
-    %%mochiglobal:put(?REDIS_POOL, PoolPidList),
+    Size = cache:config(memcached_poolsize),
+    Server = cache:config(memcached_server),
+    Port = cache:config(memcached_port),
+    io:format("--------------> start cached server:~p port:~p size:~p~n", [Server, Port, Size]),
+    {ok, PoolPid} = poolboy:start_link([{worker_module, mcd}, {size, Size}], [Server, Port]),
+    PoolPidList = erlang:pid_to_list(PoolPid),
+    mochiglobal:put(?MEMCACHED_POOL, PoolPidList),
     ok
   catch Error:Reason ->
     io:format("--------> stack:~p~n", [erlang:get_stacktrace()]),
@@ -23,19 +29,25 @@ start() ->
 -spec stop() -> ok | {error, Reason} when
     Reason :: any().
 stop() ->
-  todo.
+  Pool = mochiglobal:get(?MEMCACHED_POOL),
+  poolboy:stop(Pool).
 
 -spec get(Key) -> Value | undefined when
     Key :: any(),
     Value :: any().
 get(Key) ->
-  todo.
+  KeyBin = cache:pack_key(Key),
+  Fun = fun(Worker) -> mcd:get(Worker, KeyBin) end,
+  case do_cmd(Fun) of
+    {ok, Res} -> cache:unpack(Res);
+    _Other -> undefined
+  end.
 
 -spec gets(Keys) -> Values when
     Keys :: [any(), ...],
     Values :: [any(), ...].
 gets(Keys) when is_list(Keys) ->
-  todo.
+  [ ?MODULE:get(Key) || Key<-Keys ].
 
 -spec set(Key, Value, TTL) -> ok | {error, Reason} when
     Key :: any(),
@@ -43,7 +55,21 @@ gets(Keys) when is_list(Keys) ->
     TTL :: integer() | infinity,
     Reason :: any().
 set(Key, Value, 'infinity') ->
-  todo.
+  Key_ = cache:pack_key(Key),
+  Value_ = cache:pack(Value),
+  Fun = fun(Worker) -> mcd:set(Worker, Key_, Value_) end,
+  case do_cmd(Fun) of
+    {ok, _} -> ok;
+    Other -> Other
+  end;
+set(Key, Value, TTL) ->
+  Key_ = cache:pack_key(Key),
+  Value_ = cache:pack(Value),
+  Fun = fun(Worker) -> mcd:set(Worker, Key_, Value_, TTL) end,     
+  case do_cmd(Fun) of
+    {error, Error}=Error -> Error;
+    _ -> ok
+  end.
 
 -spec sets(KeyValues) -> ok | {error, Reason} when
   KeyValues :: [{Key, Value}, ...],
@@ -51,12 +77,23 @@ set(Key, Value, 'infinity') ->
   Value :: any(),
   Reason :: any(). 
 sets(KeyValues) ->
-  todo.
+  KeyValues_ = convert_key_values(KeyValues, []),
+  sets1(KeyValues_).
+
+sets1([{K, V, TTL}|Tail]) ->
+  ok = set(K, V, TTL),
+  sets1(Tail);
+sets1([]) -> ok.
 
 -spec delete(Key) -> ok when
     Key :: any().
 delete(Key) ->
-  todo.
+  Key_ = cache:pack_key(Key),
+  Fun = fun(Worker) -> mcd:delete(Worker, Key_) end,
+  case do_cmd(Fun) of
+    {error, _}=Error -> Error;
+    _ -> ok
+  end.
 
 -spec size() -> integer().
 size() ->
@@ -69,19 +106,14 @@ keys() ->
 
 %% Internal functions
 convert_key_values([{K, V}|Tail], Acc) ->
-  K_ = cache:pack_key(K),
-  V_ = pack(V),
-  convert_key_values(Tail, [V_, K_|Acc]);
+  convert_key_values(Tail, [{K, V, 'infinity'}|Acc]);
+convert_key_values([{_, _, _}=Other|Tail], Acc) ->
+  convert_key_values(Tail, [Other|Acc]);
 convert_key_values([], Acc) -> lists:reverse(Acc).
 
 -compile({inline, [do_cmd/1]}).
 do_cmd(Fun) ->
-  PoolList = mochiglobal:get(?REDIS_POOL),
+  PoolList = mochiglobal:get(?MEMCACHED_POOL),
   Pool = erlang:list_to_pid(PoolList),
   poolboy:transaction(Pool, Fun).
 
-%% pack and unpack value
-pack(Value) -> erlang:term_to_binary(Value).
-
-unpack(Value) when is_binary(Value) -> erlang:binary_to_term(Value);
-unpack(Other) -> Other.
